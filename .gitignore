@@ -1,5 +1,6 @@
 build/
 torneo
+test_tablero
 *.o
 *.log
 .DS_Store
