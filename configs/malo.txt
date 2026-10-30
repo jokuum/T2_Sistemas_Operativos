@@ -1,0 +1,2 @@
+retardo_min = 300
+retardo_max = 50

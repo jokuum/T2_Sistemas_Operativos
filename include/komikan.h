@@ -67,6 +67,12 @@ typedef struct {
     double prob_fallo;             /* para probar resiliencia (Parte 5) */
 } Config;
 
+//prototipos de configuracion (src/config.c)
+void config_por_defecto(Config *c);
+bool config_cargar(Config *c, const char *ruta);
+bool config_validar(const Config*c);
+void config_imprimir(const Config *c, FILE *out);
+
 // Piezas y Mesas
 struct Mesa;
 

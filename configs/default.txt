@@ -1,0 +1,13 @@
+#Configuracion por defecto del torneo Komikan
+#Formato clave = valor
+
+retardo_min = 50
+retardo_max = 300
+semilla = 42
+
+#Casillas: grilla 0..24 (fila*5 + col), trono 25 = izq, 26 = der, 27 = T
+puma = 27
+perros = 10,14,15,16,17,18,19,20,21,22,23,24
+
+#probabilidad de que un jugador falle. 0 = nunca
+prob_fallo = 0.0
