@@ -10,7 +10,7 @@
 #define FILAS            5
 #define COLS             5
 #define CASILLAS_GRILLA  (FILAS * COLS)
-#define CASILLAS_TRONO   0   /* PLACEHOLDER: se fija en la Parte 1 según la figura */
+#define CASILLAS_TRONO   4   /* 3 intermedias (25, 26, 27) + 1 cúspide T (28) */
 #define NUM_CASILLAS     (CASILLAS_GRILLA + CASILLAS_TRONO)
 #define MAX_VECINOS      8
 
@@ -30,12 +30,32 @@ typedef enum {
     ABORTADA           /* Ctrl+C */
 } EstadoPartida;
 
+/* Grafo inmutable (solo lectura tras inicializarse al inicio del programa) */
 typedef struct {
     int num_vecinos[NUM_CASILLAS];
     int vecinos[NUM_CASILLAS][MAX_VECINOS];
+    int salto[NUM_CASILLAS][NUM_CASILLAS]; /* destino al saltar de u sobre v (-1 si no hay) */
+} GrafoTablero;
+
+extern GrafoTablero g_grafo;
+
+/* Estado mutable de cada partida */
+typedef struct {
     int ocupante[NUM_CASILLAS];   /* VACIA o id de pieza (0..12) */
     int capturados;
 } Tablero;
+
+// Prototipos de funciones del Tablero (src/tablero.c)
+// NOTA: Estas funciones NO usan mutex internamente. Quien las llame
+// sobre un Tablero compartido debe tener tomado mtx_tablero.
+void inicializar_grafo(void);
+bool son_adyacentes(int a, int b);
+int  destino_salto(int origen, int sobre);
+void inicializar_tablero(Tablero *t);
+bool movimiento_valido(const Tablero *t, int origen, int destino);
+bool captura_valida(const Tablero *t, int origen, int sobre, int destino);
+bool puma_tiene_movimientos(const Tablero *t);
+void imprimir_tablero(const Tablero *t);
 
 // Configuracion
 typedef struct {
