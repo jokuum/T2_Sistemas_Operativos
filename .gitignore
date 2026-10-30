@@ -4,3 +4,5 @@ test_tablero
 *.o
 *.log
 .DS_Store
+*.dSYM/
+*.dSYM/
