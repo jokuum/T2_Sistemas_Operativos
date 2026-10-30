@@ -1,0 +1,5 @@
+build/
+torneo
+*.o
+*.log
+.DS_Store
