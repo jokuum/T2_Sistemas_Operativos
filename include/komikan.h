@@ -10,7 +10,7 @@
 #define FILAS            5
 #define COLS             5
 #define CASILLAS_GRILLA  (FILAS * COLS)
-#define CASILLAS_TRONO   4   /* 3 intermedias (25, 26, 27) + 1 cúspide T (28) */
+#define CASILLAS_TRONO   3   /* 25 = izquierda, 26 = derecha, 27 = cúspide T */
 #define NUM_CASILLAS     (CASILLAS_GRILLA + CASILLAS_TRONO)
 #define MAX_VECINOS      8
 

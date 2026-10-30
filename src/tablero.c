@@ -42,105 +42,48 @@ void inicializar_grafo(void) {
         }
     }
 
-    // 1. Conexiones en la grilla 5x5 (casillas 0 a 24)
+    // 1. Conexiones en la grilla 5x5 (casillas 0 a 24): solo ortogonales
     for (int r = 0; r < FILAS; r++) {
         for (int c = 0; c < COLS; c++) {
             int u = r * COLS + c;
-
-            // Ortogonales
-            if (c + 1 < COLS) agregar_arista(u, r * COLS + (c + 1));
-            if (r + 1 < FILAS) agregar_arista(u, (r + 1) * COLS + c);
-
-            // Diagonales (solo si fila + col es par)
-            if ((r + c) % 2 == 0) {
-                if (r + 1 < FILAS && c + 1 < COLS) {
-                    agregar_arista(u, (r + 1) * COLS + (c + 1));
-                }
-                if (r + 1 < FILAS && c - 1 >= 0) {
-                    agregar_arista(u, (r + 1) * COLS + (c - 1));
-                }
-            }
+            if (c + 1 < COLS)  agregar_arista(u, r * COLS + (c + 1));   // derecha
+            if (r + 1 < FILAS) agregar_arista(u, (r + 1) * COLS + c);   // abajo
         }
     }
 
-    // 2. Saltos en línea recta dentro de la grilla 5x5
-    int dir_orto[4][2] = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
-    int dir_diag[4][2] = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
-
+    // 2. Saltos en línea recta dentro de la grilla (distancia 2, ortogonales)
+    int dir[4][2] = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
     for (int r = 0; r < FILAS; r++) {
         for (int c = 0; c < COLS; c++) {
-            int u = r * COLS + c;
-
-            // Saltos ortogonales (distancia 2)
             for (int d = 0; d < 4; d++) {
-                int r_mid = r + dir_orto[d][0];
-                int c_mid = c + dir_orto[d][1];
-                int r_dst = r + 2 * dir_orto[d][0];
-                int c_dst = c + 2 * dir_orto[d][1];
-
+                int r_dst = r + 2 * dir[d][0];
+                int c_dst = c + 2 * dir[d][1];
                 if (r_dst >= 0 && r_dst < FILAS && c_dst >= 0 && c_dst < COLS) {
-                    int v_mid = r_mid * COLS + c_mid;
-                    int v_dst = r_dst * COLS + c_dst;
-                    g_grafo.salto[u][v_mid] = v_dst;
-                }
-            }
-
-            // Saltos diagonales (solo si r + c es par)
-            if ((r + c) % 2 == 0) {
-                for (int d = 0; d < 4; d++) {
-                    int r_mid = r + dir_diag[d][0];
-                    int c_mid = c + dir_diag[d][1];
-                    int r_dst = r + 2 * dir_diag[d][0];
-                    int c_dst = c + 2 * dir_diag[d][1];
-
-                    if (r_dst >= 0 && r_dst < FILAS && c_dst >= 0 && c_dst < COLS) {
-                        int v_mid = r_mid * COLS + c_mid;
-                        int v_dst = r_dst * COLS + c_dst;
-                        g_grafo.salto[u][v_mid] = v_dst;
-                    }
+                    int u     = r * COLS + c;
+                    int v_mid = (r + dir[d][0]) * COLS + (c + dir[d][1]);
+                    g_grafo.salto[u][v_mid] = r_dst * COLS + c_dst;
                 }
             }
         }
     }
 
-    // 3. Conexiones del Trono (25: izq, 26: centro, 27: der, 28: T)
-    // Dentro del triángulo
-    agregar_arista(28, 25);
-    agregar_arista(28, 26);
-    agregar_arista(28, 27);
-    agregar_arista(25, 26);
-    agregar_arista(26, 27);
+    // 3. Conexiones del Trono (25: izquierda, 26: derecha, 27: T)
+    agregar_arista(27, 25);   // T - izquierda
+    agregar_arista(27, 26);   // T - derecha
+    agregar_arista(25, 26);   // línea horizontal (cruza la vertical sin casilla)
+    agregar_arista(27, 2);    // vertical de T baja directo a la casilla 2
+    agregar_arista(25, 1);    // vertical izquierda
+    agregar_arista(26, 3);    // vertical derecha
+    agregar_arista(25, 0);    // lado izquierdo del triángulo
+    agregar_arista(26, 4);    // lado derecho del triángulo
 
-    // Conexión del triángulo con la fila 0 de la grilla (casillas 0, 2 y 4)
-    agregar_arista(25, 0);
-    agregar_arista(25, 2);
-    agregar_arista(26, 0);
-    agregar_arista(26, 2);
-    agregar_arista(26, 4);
-    agregar_arista(27, 2);
-    agregar_arista(27, 4);
-
-    // 4. Saltos en línea recta del Trono y frontera con la grilla
-    // Eje vertical central: 28 <-> 26 <-> 2 <-> 7
-    definir_salto(28, 26, 2);
-    definir_salto(26, 2, 7);
-
-    // Diagonal izquierda: 28 <-> 25 <-> 0 <-> 6
-    definir_salto(28, 25, 0);
-    definir_salto(25, 0, 6);
-
-    // Diagonal derecha: 28 <-> 27 <-> 4 <-> 8
-    definir_salto(28, 27, 4);
-    definir_salto(27, 4, 8);
-
-    // Horizontal intermedia del trono: 25 <-> 26 <-> 27
-    definir_salto(25, 26, 27);
-
-    // Diagonales cruzadas que pasan por casilla 2:
-    // 25 <-> 2 <-> 8 (fila 1, col 3)
-    definir_salto(25, 2, 8);
-    // 27 <-> 2 <-> 6 (fila 1, col 1)
-    definir_salto(27, 2, 6);
+    // 4. Saltos en línea recta que pasan por el trono (bidireccionales)
+    definir_salto(27, 25, 0);   // lado izquierdo:  T -> 25 -> 0
+    definir_salto(27, 26, 4);   // lado derecho:    T -> 26 -> 4
+    definir_salto(25, 1, 6);    // vertical izq.:  25 -> 1 -> 6
+    definir_salto(26, 3, 8);    // vertical der.:  26 -> 3 -> 8
+    definir_salto(27, 2, 7);    // vertical central: T -> 2 -> 7
+    // No hay salto 25 -> 26: no existe casilla intermedia.
 }
 
 bool son_adyacentes(int a, int b) {
@@ -272,40 +215,20 @@ static char simbolo_casilla(int ocupante) {
 
 void imprimir_tablero(const Tablero *t) {
     if (!t) return;
-
+    const int *o = t->ocupante;
+#define S(i) simbolo_casilla(o[i])
     printf("\n=== TABLERO KOMIKAN === (Capturas Puma: %d/%d)\n",
            t->capturados, CAPTURAS_VICTORIA);
-    printf("            ( %c )\n", simbolo_casilla(t->ocupante[28]));
-    printf("           /  |   \\\n");
-    printf("       ( %c )-( %c )-( %c )\n",
-           simbolo_casilla(t->ocupante[25]),
-           simbolo_casilla(t->ocupante[26]),
-           simbolo_casilla(t->ocupante[27]));
-    printf("      /  \\   /|\\   /  \\\n");
-    printf("    ( %c )-( %c )-( %c )-( %c )-( %c )\n",
-           simbolo_casilla(t->ocupante[0]), simbolo_casilla(t->ocupante[1]),
-           simbolo_casilla(t->ocupante[2]), simbolo_casilla(t->ocupante[3]),
-           simbolo_casilla(t->ocupante[4]));
-    printf("    | \\ | / | \\ | / |\n");
-    printf("    ( %c )-( %c )-( %c )-( %c )-( %c )\n",
-           simbolo_casilla(t->ocupante[5]), simbolo_casilla(t->ocupante[6]),
-           simbolo_casilla(t->ocupante[7]), simbolo_casilla(t->ocupante[8]),
-           simbolo_casilla(t->ocupante[9]));
-    printf("    | / | \\ | / | \\ |\n");
-    printf("    ( %c )-( %c )-( %c )-( %c )-( %c )\n",
-           simbolo_casilla(t->ocupante[10]), simbolo_casilla(t->ocupante[11]),
-           simbolo_casilla(t->ocupante[12]), simbolo_casilla(t->ocupante[13]),
-           simbolo_casilla(t->ocupante[14]));
-    printf("    | \\ | / | \\ | / |\n");
-    printf("    ( %c )-( %c )-( %c )-( %c )-( %c )\n",
-           simbolo_casilla(t->ocupante[15]), simbolo_casilla(t->ocupante[16]),
-           simbolo_casilla(t->ocupante[17]), simbolo_casilla(t->ocupante[18]),
-           simbolo_casilla(t->ocupante[19]));
-    printf("    | / | \\ | / | \\ |\n");
-    printf("    ( %c )-( %c )-( %c )-( %c )-( %c )\n",
-           simbolo_casilla(t->ocupante[20]), simbolo_casilla(t->ocupante[21]),
-           simbolo_casilla(t->ocupante[22]), simbolo_casilla(t->ocupante[23]),
-           simbolo_casilla(t->ocupante[24]));
-    printf("===============================================\n\n");
+    printf("              %c\n", S(27));
+    printf("            / | \\\n");
+    printf("          %c --+-- %c\n", S(25), S(26));
+    printf("        / |   |   | \\\n");
+    for (int r = 0; r < FILAS; r++) {
+        int b = r * COLS;
+        printf("      %c - %c - %c - %c - %c\n", S(b), S(b+1), S(b+2), S(b+3), S(b+4));
+        if (r < FILAS - 1) printf("      |   |   |   |   |\n");
+    }
+#undef S
+    printf("=============================\n\n");
 }
 
