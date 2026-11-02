@@ -78,6 +78,12 @@ bool log_abrir(const char *ruta);                 /* ruta NULL = solo consola */
 void log_cerrar(void);
 void log_msg(int mesa, const char *formato, ...); /* mesa -1 = servidor */
 
+//Aleatoriedad reproducible por hilo (src/aleatorio.c)
+unsigned int semilla_hilo(unsigned int global, int partida, int pieza);
+int  aleatorio_rango(unsigned int *estado, int min, int max);   /* [min, max] */
+bool aleatorio_prob(unsigned int *estado, double p);            /* true con prob. p */
+void dormir_ms(int ms);
+
 // Piezas y Mesas
 struct Mesa;
 

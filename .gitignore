@@ -8,3 +8,4 @@ test_tablero
 *.dSYM/
 test_log
 test.log
+test_aleatorio
