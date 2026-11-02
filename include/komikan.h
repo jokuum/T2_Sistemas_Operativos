@@ -51,7 +51,7 @@ typedef struct {
 void inicializar_grafo(void);
 bool son_adyacentes(int a, int b);
 int  destino_salto(int origen, int sobre);
-void inicializar_tablero(Tablero *t);
+void inicializar_tablero(Tablero *t, int pos_puma, const int pos_perros[NUM_PERROS]);
 bool movimiento_valido(const Tablero *t, int origen, int destino);
 bool captura_valida(const Tablero *t, int origen, int sobre, int destino);
 bool puma_tiene_movimientos(const Tablero *t);
@@ -66,6 +66,23 @@ typedef struct {
     int pos_perros[NUM_PERROS];
     double prob_fallo;             /* para probar resiliencia (Parte 5) */
 } Config;
+
+//prototipos de configuracion (src/config.c)
+void config_por_defecto(Config *c);
+bool config_cargar(Config *c, const char *ruta);
+bool config_validar(const Config*c);
+void config_imprimir(const Config *c, FILE *out);
+
+//log thread safe (src/log.c)
+bool log_abrir(const char *ruta);                 /* ruta NULL = solo consola */
+void log_cerrar(void);
+void log_msg(int mesa, const char *formato, ...); /* mesa -1 = servidor */
+
+//Aleatoriedad reproducible por hilo (src/aleatorio.c)
+unsigned int semilla_hilo(unsigned int global, int partida, int pieza);
+int  aleatorio_rango(unsigned int *estado, int min, int max);   /* [min, max] */
+bool aleatorio_prob(unsigned int *estado, double p);            /* true con prob. p */
+void dormir_ms(int ms);
 
 // Piezas y Mesas
 struct Mesa;
