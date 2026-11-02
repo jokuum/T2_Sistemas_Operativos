@@ -41,5 +41,9 @@ int main(int argc, char *argv[]) {
 
     printf("Torneo Komikan: N=%d jugadores, M=%d mesas\n", N, M);
     config_imprimir(&cfg, stdout);
+    //prueba tablero inicial según la config
+    Tablero t;
+    inicializar_tablero(&t, cfg.pos_puma, cfg.pos_perros);
+    imprimir_tablero(&t);
     return EXIT_SUCCESS;
 }

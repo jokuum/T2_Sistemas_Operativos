@@ -63,7 +63,8 @@ int main(void) {
 
     // Probar tablero inicial e imprimirlo
     Tablero inicial;
-    inicializar_tablero(&inicial);
+    int perros[NUM_PERROS] = {10, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24};
+    inicializar_tablero(&inicial, 27, perros);
     assert(puma_tiene_movimientos(&inicial));
 
     printf("\nVisualizacion del tablero inicial:\n");

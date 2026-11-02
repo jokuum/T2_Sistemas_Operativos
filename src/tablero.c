@@ -105,35 +105,17 @@ int destino_salto(int origen, int sobre) {
     return g_grafo.salto[origen][sobre];
 }
 
-void inicializar_tablero(Tablero *t) {
+void inicializar_tablero(Tablero *t, int pos_puma, const int pos_perros[NUM_PERROS]) {
     if (!t) return;
     for (int i = 0; i < NUM_CASILLAS; i++) {
         t->ocupante[i] = VACIA;
     }
     t->capturados = 0;
 
-    // Disposición estándar inicial de Komikan:
-    // Puma (id 0) en el centro de la grilla (fila 2, col 2 -> id 12)
-    t->ocupante[12] = 0;
-
-    // 12 Perros (ids 1..12) en las filas inferiores:
-    // Fila 4 (20..24): 5 perros
-    t->ocupante[20] = 1;
-    t->ocupante[21] = 2;
-    t->ocupante[22] = 3;
-    t->ocupante[23] = 4;
-    t->ocupante[24] = 5;
-
-    // Fila 3 (15..19): 5 perros
-    t->ocupante[15] = 6;
-    t->ocupante[16] = 7;
-    t->ocupante[17] = 8;
-    t->ocupante[18] = 9;
-    t->ocupante[19] = 10;
-
-    // Fila 2 extremos (10 y 14): 2 perros
-    t->ocupante[10] = 11;
-    t->ocupante[14] = 12;
+    t->ocupante[pos_puma] = 0;                  /* puma = pieza 0 */
+    for (int i = 0; i < NUM_PERROS; i++) {
+        t->ocupante[pos_perros[i]] = i + 1;     /* perros = piezas 1..12 */
+    }
 }
 
 bool movimiento_valido(const Tablero *t, int origen, int destino) {

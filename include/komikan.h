@@ -51,7 +51,7 @@ typedef struct {
 void inicializar_grafo(void);
 bool son_adyacentes(int a, int b);
 int  destino_salto(int origen, int sobre);
-void inicializar_tablero(Tablero *t);
+void inicializar_tablero(Tablero *t, int pos_puma, const int pos_perros[NUM_PERROS]);
 bool movimiento_valido(const Tablero *t, int origen, int destino);
 bool captura_valida(const Tablero *t, int origen, int sobre, int destino);
 bool puma_tiene_movimientos(const Tablero *t);
