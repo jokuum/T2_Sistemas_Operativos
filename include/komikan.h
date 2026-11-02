@@ -18,6 +18,7 @@
 #define NUM_PIEZAS       (NUM_PERROS + 1)   /* índice 0 = puma, 1..12 = perros */
 #define CAPTURAS_VICTORIA 6
 #define VACIA            (-1)
+#define MAX_MOVIMIENTOS  1000  /* límite para evitar partidas infinitas */
 
 typedef enum { PUMA, PERRO } TipoPieza;
 
@@ -27,7 +28,8 @@ typedef enum {
     GANA_PERROS,
     ABANDONO_PUMA,     /* puma falló → ganan perros */
     ABANDONO_PERROS,   /* perros fallaron → gana puma */
-    ABORTADA           /* Ctrl+C */
+    ABORTADA,          /* Ctrl+C */
+    EMPATE             /* se alcanzó MAX_MOVIMIENTOS sin ganador */
 } EstadoPartida;
 
 /* Grafo inmutable (solo lectura tras inicializarse al inicio del programa) */
@@ -109,10 +111,17 @@ typedef struct Mesa {
     pthread_cond_t  cv_fin;        /* el juez espera aquí el fin de partida */
     EstadoPartida estado;
     bool terminar;                 /* señal para que las piezas salgan */
+    int movimientos_totales;       /* contador para detectar empate */
 
     pthread_t hilo_juez;
     const Config *cfg;
+    int partida;                   /* número de partida (para semilla) */
 } Mesa;
+
+// Mesa de juego (src/mesa.c)
+void mesa_inicializar(Mesa *m, int id, const Config *cfg);
+EstadoPartida mesa_jugar(Mesa *m, int partida, int jugador_puma, int jugador_perros);
+void mesa_destruir(Mesa *m);
 
 // Servidor
 typedef struct {

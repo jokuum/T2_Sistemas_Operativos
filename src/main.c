@@ -39,11 +39,30 @@ int main(int argc, char *argv[]) {
     /* 4. Grafo del tablero: una sola vez, antes de crear hilos */
     inicializar_grafo();
 
-    printf("Torneo Komikan: N=%d jugadores, M=%d mesas\n", N, M);
-    config_imprimir(&cfg, stdout);
-    //prueba tablero inicial según la config
-    Tablero t;
-    inicializar_tablero(&t, cfg.pos_puma, cfg.pos_perros);
-    imprimir_tablero(&t);
+    /* 5. Abrir el log (consola + archivo) */
+    log_abrir("torneo.log");
+
+    log_msg(-1, "Torneo Komikan: N=%d jugadores, M=%d mesas", N, M);
+
+    /* 6. Probar UNA partida en UNA mesa (Parte 3).
+     *    En la Parte 4, esto lo reemplaza el Matchmaker. */
+    Mesa mesa;
+    mesa_inicializar(&mesa, 0, &cfg);
+    EstadoPartida resultado = mesa_jugar(&mesa, 0, 1, 2);
+
+    const char *txt_resultado;
+    switch (resultado) {
+        case GANA_PUMA:    txt_resultado = "GANA PUMA";    break;
+        case GANA_PERROS:  txt_resultado = "GANAN PERROS"; break;
+        case EMPATE:       txt_resultado = "EMPATE";       break;
+        default:           txt_resultado = "DESCONOCIDO";  break;
+    }
+    log_msg(-1, "Resultado final: %s", txt_resultado);
+
+    mesa_destruir(&mesa);
+
+    /* 7. Cerrar el log */
+    log_cerrar();
+
     return EXIT_SUCCESS;
 }
