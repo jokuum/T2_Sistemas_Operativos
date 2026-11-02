@@ -44,22 +44,14 @@ int main(int argc, char *argv[]) {
 
     log_msg(-1, "Torneo Komikan: N=%d jugadores, M=%d mesas", N, M);
 
-    /* 6. Probar UNA partida en UNA mesa (Parte 3).
-     *    En la Parte 4, esto lo reemplaza el Matchmaker. */
-    Mesa mesa;
-    mesa_inicializar(&mesa, 0, &cfg);
-    EstadoPartida resultado = mesa_jugar(&mesa, 0, 1, 2);
-
-    const char *txt_resultado;
-    switch (resultado) {
-        case GANA_PUMA:    txt_resultado = "GANA PUMA";    break;
-        case GANA_PERROS:  txt_resultado = "GANAN PERROS"; break;
-        case EMPATE:       txt_resultado = "EMPATE";       break;
-        default:           txt_resultado = "DESCONOCIDO";  break;
+    /* 6. Servidor / Matchmaker */
+    Servidor srv;
+    if (!servidor_inicializar(&srv, N, M, &cfg)) {
+        log_cerrar();
+        return EXIT_FAILURE;
     }
-    log_msg(-1, "Resultado final: %s", txt_resultado);
-
-    mesa_destruir(&mesa);
+    servidor_ejecutar(&srv);
+    servidor_destruir(&srv);
 
     /* 7. Cerrar el log */
     log_cerrar();

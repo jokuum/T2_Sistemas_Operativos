@@ -123,15 +123,34 @@ void mesa_inicializar(Mesa *m, int id, const Config *cfg);
 EstadoPartida mesa_jugar(Mesa *m, int partida, int jugador_puma, int jugador_perros);
 void mesa_destruir(Mesa *m);
 
-// Servidor
+// Servidor / Matchmaker
 typedef struct {
-    int N;                 /* jugadores totales */
-    int M;                 /* mesas simultáneas máximas */
-    Config cfg;
-    Mesa *mesas;           /* arreglo de M mesas */
-    sem_t sem_mesas;       /* cuenta mesas libres */
-    pthread_mutex_t mtx_servidor;
-    bool apagando;         /* true tras Ctrl+C */
+    int N;                     /* jugadores totales */
+    int M;                     /* mesas simultáneas máximas */
+    const Config *cfg;
+
+    Mesa *mesas;               /* arreglo de M mesas */
+    bool *mesa_ocupada;        /* mesa_ocupada[i] = true si la mesa i está en uso */
+
+    sem_t sem_mesas;           /* cuenta mesas libres (parte en M) */
+
+    pthread_mutex_t mtx_servidor;  /* protege todo lo de abajo y mesa_ocupada */
+    pthread_cond_t  cv_pareja;     /* el jugador en espera duerme aquí */
+    int esperando;             /* id del jugador esperando rival, -1 si nadie */
+    int llegados;              /* cuántos jugadores han llegado */
+    int partidas;              /* contador de partidas (número de partida) */
+    bool apagando;             /* true tras Ctrl+C (Parte 6) */
 } Servidor;
+
+typedef struct {
+    int id;
+    pthread_t hilo;
+    Servidor *srv;
+} Cliente;
+
+// Servidor (src/servidor.c)
+bool servidor_inicializar(Servidor *s, int N, int M, const Config *cfg);
+void servidor_ejecutar(Servidor *s);
+void servidor_destruir(Servidor *s);
 
 #endif
