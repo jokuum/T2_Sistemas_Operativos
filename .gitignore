@@ -6,3 +6,5 @@ test_tablero
 .DS_Store
 *.dSYM/
 *.dSYM/
+test_log
+test.log

@@ -73,6 +73,11 @@ bool config_cargar(Config *c, const char *ruta);
 bool config_validar(const Config*c);
 void config_imprimir(const Config *c, FILE *out);
 
+//log thread safe (src/log.c)
+bool log_abrir(const char *ruta);                 /* ruta NULL = solo consola */
+void log_cerrar(void);
+void log_msg(int mesa, const char *formato, ...); /* mesa -1 = servidor */
+
 // Piezas y Mesas
 struct Mesa;
 
