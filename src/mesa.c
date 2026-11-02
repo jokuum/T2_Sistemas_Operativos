@@ -96,7 +96,7 @@ static void *hilo_pieza(void *arg) {
         pthread_mutex_lock(&m->mtx_tablero);
 
         /* ── PASO 3: ¿Terminó la partida o me capturaron? ── */
-        if (m->terminar || !p->viva) {
+        if (m->terminar || m->estado != EN_CURSO || !p->viva) {
             pthread_mutex_unlock(&m->mtx_tablero);
             break;
         }
