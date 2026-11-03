@@ -1,6 +1,12 @@
 #ifndef KOMIKAN_H
 #define KOMIKAN_H
 
+/* Habilita las funciones POSIX 2008 (mutex robustos, rand_r, nanosleep,
+   clock_gettime, sigwait...) */
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdbool.h>
