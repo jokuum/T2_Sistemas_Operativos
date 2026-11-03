@@ -112,6 +112,7 @@ typedef struct Mesa {
     EstadoPartida estado;
     bool terminar;                 /* señal para que las piezas salgan */
     int movimientos_totales;       /* contador para detectar empate */
+    int dueno_lock;                /* id de la pieza con el lock (-1 si ninguna) */
 
     pthread_t hilo_juez;
     const Config *cfg;

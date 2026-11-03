@@ -1,0 +1,11 @@
+# Configuracion de prueba para fallos y resiliencia
+retardo_min = 5
+retardo_max = 20
+semilla = 42
+
+puma = 27
+perros = 10,14,15,16,17,18,19,20,21,22,23,24
+
+# Probabilidad de fallo por ciclo de cada pieza
+prob_fallo = 0.002
+
