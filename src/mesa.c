@@ -228,6 +228,7 @@ static void *hilo_juez(void *arg) {
         case ABANDONO_PUMA:    resultado = "ABANDONO PUMA (GANAN PERROS)"; break;
         case ABANDONO_PERROS:  resultado = "ABANDONO PERROS (GANA PUMA)"; break;
         case EMPATE:           resultado = "EMPATE"; break;
+        case ABORTADA:         resultado = "ABORTADA (Ctrl+C)"; break;
         default:               resultado = "DESCONOCIDO"; break;
     }
     log_msg(m->id, "Partida %d finalizada: %s (movimientos: %d)",
@@ -255,20 +256,33 @@ void mesa_inicializar(Mesa *m, int id, const Config *cfg) {
     pthread_cond_init(&m->cv_fin, NULL);
 }
 
+void mesa_preparar(Mesa *m) {
+    m->estado              = EN_CURSO;
+    m->terminar            = false;
+    m->movimientos_totales = 0;
+    m->dueno_lock          = -1;
+}
+
 EstadoPartida mesa_jugar(Mesa *m, int partida,
                          int jugador_puma, int jugador_perros) {
     m->jugador_puma   = jugador_puma;
     m->jugador_perros = jugador_perros;
     m->partida        = partida;
-    m->estado         = EN_CURSO;
-    m->terminar       = false;
-    m->movimientos_totales = 0;
-    m->dueno_lock     = -1;
 
     pthread_create(&m->hilo_juez, NULL, hilo_juez, m);
     pthread_join(m->hilo_juez, NULL);
 
     return m->estado;
+}
+
+void mesa_abortar(Mesa *m) {
+    mesa_lock(m);
+    if (m->estado == EN_CURSO) {
+        m->estado = ABORTADA;
+    }
+    m->terminar = true;
+    pthread_cond_signal(&m->cv_fin);
+    pthread_mutex_unlock(&m->mtx_tablero);
 }
 
 void mesa_destruir(Mesa *m) {
