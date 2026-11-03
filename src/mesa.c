@@ -2,32 +2,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 
-/* ================================================================
- * CONSTANTE: tamaño del buffer para imprimir el tablero por log.
- * Necesitamos espacio suficiente para el dibujo ASCII completo.
- * ================================================================ */
 #define TABLERO_BUF 1024
 
-/* ================================================================
- * HELPER: imprimir_tablero_log
- * 
- * ¿POR QUÉ EXISTE?
- * El imprimir_tablero() original usa printf directo. Si hay varias
- * mesas jugando al mismo tiempo, los printf de una mesa se mezclan
- * con los de otra → sale basura en pantalla.
- * 
- * SOLUCIÓN: Armamos todo el dibujo en un buffer (char buf[]) usando
- * snprintf, y luego lo enviamos completo con log_msg(). Como log_msg
- * tiene su propio mutex (mtx_log), el tablero entero se imprime como
- * un bloque atómico, sin que otra mesa pueda intercalarse.
- * ================================================================ */
+/* Imprime el tablero en un buffer para volcarlo de forma atomica en el log */
 static void imprimir_tablero_log(const Mesa *m) {
     char buf[TABLERO_BUF];
     int pos = 0;
     const int *o = m->tablero.ocupante;
 
-    /* Función auxiliar local: convierte un ocupante a su símbolo */
     #define S(i) (o[i] == VACIA ? '.' : (o[i] == 0 ? 'P' : 'D'))
 
     pos += snprintf(buf + pos, sizeof(buf) - pos,
@@ -58,53 +42,58 @@ static void imprimir_tablero_log(const Mesa *m) {
     log_msg(m->id, "%s", buf);
 }
 
-/* ================================================================
- * FUNCIÓN DEL HILO DE CADA PIEZA (puma o perro)
- * 
- * Cada pieza es un hilo independiente que repite este ciclo:
- *   1. Dormir un tiempo aleatorio (FUERA del mutex)
- *   2. Tomar el mutex
- *   3. Si la partida terminó o fui capturado → salir
- *   4. Buscar un movimiento válido al azar y ejecutarlo
- *   5. Revisar si alguien ganó
- *   6. Soltar el mutex
- * 
- * ¿POR QUÉ DORMIR FUERA DEL MUTEX?
- * Si durmiera CON el mutex tomado, las demás 12 piezas no podrían
- * hacer nada durante 50-300ms. Perderíamos toda la concurrencia.
- * El dormir simula el "tiempo de reacción" de cada pieza. Durante
- * ese tiempo, el tablero DEBE estar disponible para las demás.
- * 
- * ¿POR QUÉ UN SOLO MUTEX POR MESA (y no uno por casilla)?
- * - Con 1 mutex: imposible tener deadlock (necesitas ≥2 locks).
- * - La sección crítica es MUY corta (microsegundos), mientras que
- *   el dormir (50-300ms) es miles de veces más largo y va sin lock.
- * - Con mutex por casilla tendríamos 28 mutexes y riesgo de deadlock.
- * ================================================================ */
+/* Bloquea mtx_tablero y recupera el mutex si el hilo anterior murio reteniendolo */
+static int mesa_lock(Mesa *m) {
+    int rc = pthread_mutex_lock(&m->mtx_tablero);
+    if (rc == EOWNERDEAD) {
+        pthread_mutex_consistent(&m->mtx_tablero);
+        if (m->estado == EN_CURSO) {
+            int fallido = m->dueno_lock;
+            if (fallido == 0) {
+                m->estado = ABANDONO_PUMA;
+            } else {
+                m->estado = ABANDONO_PERROS;
+            }
+            log_msg(m->id, "Pieza %d fallo con lock tomado. Abandono declarado.", fallido);
+            pthread_cond_signal(&m->cv_fin);
+        }
+    }
+    return rc;
+}
+
+/* Ciclo principal de cada pieza (puma o perro) */
 static void *hilo_pieza(void *arg) {
     Pieza *p = (Pieza *)arg;
     Mesa  *m = p->mesa;
 
     while (1) {
-        /* ── PASO 1: Dormir FUERA del mutex ── */
+        /* Retardo aleatorio fuera de la seccion critica */
         int ms = aleatorio_rango(&p->rng,
                                  m->cfg->retardo_min_ms,
                                  m->cfg->retardo_max_ms);
         dormir_ms(ms);
 
-        /* ── PASO 2: Tomar el mutex ── */
-        pthread_mutex_lock(&m->mtx_tablero);
+        mesa_lock(m);
+        m->dueno_lock = p->id;
 
-        /* ── PASO 3: ¿Terminó la partida o me capturaron? ── */
+        /* Salir si la partida concluyo o la pieza fue capturada */
         if (m->terminar || m->estado != EN_CURSO || !p->viva) {
+            m->dueno_lock = -1;
             pthread_mutex_unlock(&m->mtx_tablero);
             break;
         }
 
-        /* ── PASO 4: Buscar movimientos válidos ── */
+        /* Simulacion de fallo: la pieza aborta con el lock tomado */
+        if (m->cfg->prob_fallo > 0.0 && aleatorio_prob(&p->rng, m->cfg->prob_fallo)) {
+            log_msg(m->id, "Pieza %d (%s) sufre fallo interno y aborta",
+                    p->id, p->tipo == PUMA ? "PUMA" : "PERRO");
+            pthread_exit(NULL);
+        }
+
+        /* Recopilar movimientos validos */
         struct Mov {
             int destino;
-            int captura_sobre;  /* -1 si es movimiento simple */
+            int captura_sobre;
         };
         struct Mov opciones[MAX_VECINOS * 2];
         int n_opciones = 0;
@@ -113,14 +102,12 @@ static void *hilo_pieza(void *arg) {
         for (int i = 0; i < g_grafo.num_vecinos[origen]; i++) {
             int vec = g_grafo.vecinos[origen][i];
 
-            /* Movimiento simple: vecino vacío */
             if (movimiento_valido(&m->tablero, origen, vec)) {
                 opciones[n_opciones].destino = vec;
                 opciones[n_opciones].captura_sobre = -1;
                 n_opciones++;
             }
 
-            /* Captura (solo el puma): saltar sobre un perro */
             if (p->tipo == PUMA &&
                 m->tablero.ocupante[vec] >= 1 &&
                 m->tablero.ocupante[vec] <= NUM_PERROS) {
@@ -133,13 +120,11 @@ static void *hilo_pieza(void *arg) {
             }
         }
 
-        /* Elegir uno al azar y ejecutarlo */
         if (n_opciones > 0) {
             int idx = aleatorio_rango(&p->rng, 0, n_opciones - 1);
             struct Mov elegido = opciones[idx];
 
             if (elegido.captura_sobre >= 0) {
-                /* ── CAPTURA: puma salta sobre perro ── */
                 int id_perro = m->tablero.ocupante[elegido.captura_sobre];
                 m->piezas[id_perro].viva = false;
                 m->piezas[id_perro].casilla = -1;
@@ -155,7 +140,6 @@ static void *hilo_pieza(void *arg) {
                         elegido.captura_sobre,
                         m->tablero.capturados, CAPTURAS_VICTORIA);
             } else {
-                /* ── MOVIMIENTO SIMPLE ── */
                 m->tablero.ocupante[elegido.destino] = p->id;
                 m->tablero.ocupante[origen] = VACIA;
                 p->casilla = elegido.destino;
@@ -168,7 +152,6 @@ static void *hilo_pieza(void *arg) {
             m->movimientos_totales++;
             imprimir_tablero_log(m);
 
-            /* ── PASO 5: Revisar condiciones de victoria ── */
             if (m->tablero.capturados >= CAPTURAS_VICTORIA) {
                 m->estado = GANA_PUMA;
                 pthread_cond_signal(&m->cv_fin);
@@ -181,23 +164,19 @@ static void *hilo_pieza(void *arg) {
             }
         }
 
-        /* ── PASO 6: Soltar el mutex ── */
+        m->dueno_lock = -1;
         pthread_mutex_unlock(&m->mtx_tablero);
     }
 
     return NULL;
 }
 
-/* ================================================================
- * FUNCIÓN DEL HILO JUEZ
- * ================================================================ */
+/* Hilo juez encargado de coordinar la mesa */
 static void *hilo_juez(void *arg) {
     Mesa *m = (Mesa *)arg;
 
-    /* 1. Inicializar el tablero */
     inicializar_tablero(&m->tablero, m->cfg->pos_puma, m->cfg->pos_perros);
 
-    /* 2. Inicializar las 13 piezas */
     for (int i = 0; i < NUM_PIEZAS; i++) {
         m->piezas[i].id   = i;
         m->piezas[i].tipo = (i == 0) ? PUMA : PERRO;
@@ -218,31 +197,38 @@ static void *hilo_juez(void *arg) {
             m->partida, m->jugador_puma, m->jugador_perros);
     imprimir_tablero_log(m);
 
-    /* 3. Crear los 13 hilos de piezas */
     for (int i = 0; i < NUM_PIEZAS; i++) {
         pthread_create(&m->piezas[i].hilo, NULL, hilo_pieza, &m->piezas[i]);
     }
 
-    /* 4. Esperar el fin de la partida (while contra spurious wakeups) */
-    pthread_mutex_lock(&m->mtx_tablero);
+    mesa_lock(m);
     while (m->estado == EN_CURSO) {
-        pthread_cond_wait(&m->cv_fin, &m->mtx_tablero);
+        int rc = pthread_cond_wait(&m->cv_fin, &m->mtx_tablero);
+        if (rc == EOWNERDEAD) {
+            pthread_mutex_consistent(&m->mtx_tablero);
+            if (m->estado == EN_CURSO) {
+                int fallido = m->dueno_lock;
+                m->estado = (fallido == 0) ? ABANDONO_PUMA : ABANDONO_PERROS;
+                log_msg(m->id, "Pieza %d fallo con lock tomado. Abandono declarado.", fallido);
+            }
+        }
     }
     m->terminar = true;
+    m->dueno_lock = -1;
     pthread_mutex_unlock(&m->mtx_tablero);
 
-    /* 5. Esperar que todos los hilos terminen */
     for (int i = 0; i < NUM_PIEZAS; i++) {
         pthread_join(m->piezas[i].hilo, NULL);
     }
 
-    /* 6. Anunciar resultado */
     const char *resultado;
     switch (m->estado) {
-        case GANA_PUMA:    resultado = "GANA PUMA";    break;
-        case GANA_PERROS:  resultado = "GANAN PERROS"; break;
-        case EMPATE:       resultado = "EMPATE";       break;
-        default:           resultado = "DESCONOCIDO";  break;
+        case GANA_PUMA:        resultado = "GANA PUMA"; break;
+        case GANA_PERROS:      resultado = "GANAN PERROS"; break;
+        case ABANDONO_PUMA:    resultado = "ABANDONO PUMA (GANAN PERROS)"; break;
+        case ABANDONO_PERROS:  resultado = "ABANDONO PERROS (GANA PUMA)"; break;
+        case EMPATE:           resultado = "EMPATE"; break;
+        default:               resultado = "DESCONOCIDO"; break;
     }
     log_msg(m->id, "Partida %d finalizada: %s (movimientos: %d)",
             m->partida, resultado, m->movimientos_totales);
@@ -250,9 +236,6 @@ static void *hilo_juez(void *arg) {
     return NULL;
 }
 
-/* ================================================================
- * INTERFAZ PÚBLICA
- * ================================================================ */
 void mesa_inicializar(Mesa *m, int id, const Config *cfg) {
     memset(m, 0, sizeof(Mesa));
     m->id  = id;
@@ -260,7 +243,15 @@ void mesa_inicializar(Mesa *m, int id, const Config *cfg) {
     m->estado   = EN_CURSO;
     m->terminar = false;
     m->movimientos_totales = 0;
-    pthread_mutex_init(&m->mtx_tablero, NULL);
+    m->dueno_lock = -1;
+
+    /* Mutex robusto para permitir recuperacion ante fallos con lock tomado */
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST);
+    pthread_mutex_init(&m->mtx_tablero, &attr);
+    pthread_mutexattr_destroy(&attr);
+
     pthread_cond_init(&m->cv_fin, NULL);
 }
 
@@ -272,6 +263,7 @@ EstadoPartida mesa_jugar(Mesa *m, int partida,
     m->estado         = EN_CURSO;
     m->terminar       = false;
     m->movimientos_totales = 0;
+    m->dueno_lock     = -1;
 
     pthread_create(&m->hilo_juez, NULL, hilo_juez, m);
     pthread_join(m->hilo_juez, NULL);
