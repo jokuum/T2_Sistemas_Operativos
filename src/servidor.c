@@ -56,8 +56,15 @@ static void jugar_partida(Servidor *s, int jugador_puma, int jugador_perros, int
     log_msg(-1, "Par (%d, %d) espera mesa", jugador_puma, jugador_perros);
     sem_wait(&s->sem_mesas);
 
-    /* 2. Reservar una mesa libre */
+    /* 2. Reservar una mesa libre (salvo que el servidor se esté apagando) */
     pthread_mutex_lock(&s->mtx_servidor);
+    if (s->apagando) {
+        pthread_mutex_unlock(&s->mtx_servidor);
+        log_msg(-1, "Par (%d, %d) cancelado: servidor apagándose",
+                jugador_puma, jugador_perros);
+        sem_post(&s->sem_mesas);   /* despierta al siguiente par en espera */
+        return;
+    }
     int id_mesa = -1;
     for (int i = 0; i < s->M; i++) {
         if (!s->mesa_ocupada[i]) {
@@ -66,6 +73,7 @@ static void jugar_partida(Servidor *s, int jugador_puma, int jugador_perros, int
             break;
         }
     }
+    mesa_preparar(&s->mesas[id_mesa]);
     pthread_mutex_unlock(&s->mtx_servidor);
 
     log_msg(-1, "Partida %d: jugadores %d (puma) y %d (perros) -> Mesa %d",
@@ -93,6 +101,11 @@ static void *hilo_cliente(void *arg) {
     dormir_ms(aleatorio_rango(&rng, 0, 200));
 
     pthread_mutex_lock(&s->mtx_servidor);
+    if (s->apagando) {
+        pthread_mutex_unlock(&s->mtx_servidor);
+        log_msg(-1, "Jugador %d rechazado: servidor apagándose", c->id);
+        return NULL;
+    }
     s->llegados++;
     log_msg(-1, "Llega jugador %d (%d/%d)", c->id, s->llegados, s->N);
 
@@ -105,8 +118,12 @@ static void *hilo_cliente(void *arg) {
         }
         /* Nadie esperando: quedo en espera hasta que llegue un rival */
         s->esperando = c->id;
-        while (s->esperando == c->id) {
+        while (s->esperando == c->id && !s->apagando) {
             pthread_cond_wait(&s->cv_pareja, &s->mtx_servidor);
+        }
+        if (s->esperando == c->id) {          /* despertó por Ctrl+C, sin rival */
+            s->esperando = -1;
+            log_msg(-1, "Jugador %d deja de esperar: servidor apagándose", c->id);
         }
         pthread_mutex_unlock(&s->mtx_servidor);
         return NULL;   /* mi rival se encarga de la partida */
@@ -140,5 +157,29 @@ void servidor_ejecutar(Servidor *s) {
         pthread_join(clientes[i].hilo, NULL);
     }
     free(clientes);
-    log_msg(-1, "Torneo finalizado: %d partidas jugadas", s->partidas);
+    log_msg(-1, "Torneo finalizado%s: %d partidas iniciadas",
+            s->apagando ? " por Ctrl+C" : "", s->partidas);
+}
+
+// Apagado ordenado (Ctrl+C)
+
+void servidor_apagar(Servidor *s) {
+    pthread_mutex_lock(&s->mtx_servidor);
+    if (s->apagando) {                       /* ya se estaba apagando */
+        pthread_mutex_unlock(&s->mtx_servidor);
+        return;
+    }
+    s->apagando = true;
+    log_msg(-1, "SIGINT recibido: apagando servidor...");
+
+    /* 1. Despertar al jugador que espera rival */
+    pthread_cond_broadcast(&s->cv_pareja);
+
+    /* 2. Pedir a cada partida activa que termine */
+    for (int i = 0; i < s->M; i++) {
+        if (s->mesa_ocupada[i]) {
+            mesa_abortar(&s->mesas[i]);
+        }
+    }
+    pthread_mutex_unlock(&s->mtx_servidor);
 }

@@ -121,7 +121,9 @@ typedef struct Mesa {
 
 // Mesa de juego (src/mesa.c)
 void mesa_inicializar(Mesa *m, int id, const Config *cfg);
+void mesa_preparar(Mesa *m);      /* deja la mesa lista para una partida nueva */
 EstadoPartida mesa_jugar(Mesa *m, int partida, int jugador_puma, int jugador_perros);
+void mesa_abortar(Mesa *m);       /* Ctrl+C: pide terminar la partida en curso */
 void mesa_destruir(Mesa *m);
 
 // Servidor / Matchmaker
@@ -153,5 +155,11 @@ typedef struct {
 bool servidor_inicializar(Servidor *s, int N, int M, const Config *cfg);
 void servidor_ejecutar(Servidor *s);
 void servidor_destruir(Servidor *s);
+
+void servidor_apagar(Servidor *s);  /* Ctrl+C: apagado ordenado */
+
+// señales(src/senales.c)
+bool senales_iniciar(Servidor *s);  /* Bloquea SIGINT y crea el hilo de señañes */
+void senales_detener(void);              /* Desbloquea SIGINT y termina el hilo de señales */
 
 #endif

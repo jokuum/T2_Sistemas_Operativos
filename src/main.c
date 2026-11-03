@@ -50,7 +50,20 @@ int main(int argc, char *argv[]) {
         log_cerrar();
         return EXIT_FAILURE;
     }
+
+    /* Señales: bloquear SIGINT y crear el hilo de señales ANTES de crear
+       los hilos del torneo, para que todos hereden la máscara */
+    if (!senales_iniciar(&srv)) {
+        servidor_destruir(&srv);
+        log_cerrar();
+        return EXIT_FAILURE;
+    }
+
     servidor_ejecutar(&srv);
+
+    /* Detener el hilo de señales ANTES de destruir el servidor,
+       para que nadie llame a servidor_apagar sobre recursos destruidos */
+    senales_detener();
     servidor_destruir(&srv);
 
     /* 7. Cerrar el log */
