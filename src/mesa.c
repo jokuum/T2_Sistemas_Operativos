@@ -197,8 +197,18 @@ static void *hilo_juez(void *arg) {
             m->partida, m->jugador_puma, m->jugador_perros);
     imprimir_tablero_log(m);
 
+    int creadas = 0;
     for (int i = 0; i < NUM_PIEZAS; i++) {
-        pthread_create(&m->piezas[i].hilo, NULL, hilo_pieza, &m->piezas[i]);
+        int rc = pthread_create(&m->piezas[i].hilo, NULL, hilo_pieza, &m->piezas[i]);
+        if (rc != 0) {
+            log_msg(m->id, "No se pudo crear la pieza %d: %s. Partida abortada",
+                    i, strerror(rc));
+            mesa_lock(m);
+            if (m->estado == EN_CURSO) m->estado = ABORTADA;
+            pthread_mutex_unlock(&m->mtx_tablero);
+            break;
+        }
+        creadas++;
     }
 
     mesa_lock(m);
@@ -217,7 +227,7 @@ static void *hilo_juez(void *arg) {
     m->dueno_lock = -1;
     pthread_mutex_unlock(&m->mtx_tablero);
 
-    for (int i = 0; i < NUM_PIEZAS; i++) {
+    for (int i = 0; i < creadas; i++) {
         pthread_join(m->piezas[i].hilo, NULL);
     }
 
@@ -228,7 +238,7 @@ static void *hilo_juez(void *arg) {
         case ABANDONO_PUMA:    resultado = "ABANDONO PUMA (GANAN PERROS)"; break;
         case ABANDONO_PERROS:  resultado = "ABANDONO PERROS (GANA PUMA)"; break;
         case EMPATE:           resultado = "EMPATE"; break;
-        case ABORTADA:         resultado = "ABORTADA (Ctrl+C)"; break;
+        case ABORTADA:         resultado = "ABORTADA"; break;
         default:               resultado = "DESCONOCIDO"; break;
     }
     log_msg(m->id, "Partida %d finalizada: %s (movimientos: %d)",
@@ -269,7 +279,12 @@ EstadoPartida mesa_jugar(Mesa *m, int partida,
     m->jugador_perros = jugador_perros;
     m->partida        = partida;
 
-    pthread_create(&m->hilo_juez, NULL, hilo_juez, m);
+    int rc = pthread_create(&m->hilo_juez, NULL, hilo_juez, m);
+    if (rc != 0) {
+        log_msg(m->id, "No se pudo crear el juez: %s. Partida abortada", strerror(rc));
+        m->estado = ABORTADA;
+        return m->estado;
+    }
     pthread_join(m->hilo_juez, NULL);
 
     return m->estado;

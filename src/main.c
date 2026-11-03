@@ -43,7 +43,8 @@ int main(int argc, char *argv[]) {
     log_abrir("torneo.log");
 
     log_msg(-1, "Torneo Komikan: N=%d jugadores, M=%d mesas", N, M);
-
+    config_imprimir(&cfg);
+    
     /* 6. Servidor / Matchmaker */
     Servidor srv;
     if (!servidor_inicializar(&srv, N, M, &cfg)) {

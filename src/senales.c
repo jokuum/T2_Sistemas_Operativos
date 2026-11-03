@@ -11,6 +11,7 @@ static void *hilo_de_senales(void *arg) {
     while (1) {
         sigwait(&senales, &sig);
         if (sig == SIGINT) {
+            log_msg(-1, "SIGINT recibido (Ctrl+C)");
             servidor_apagar(s);
         } else if (sig == SIGUSR1) {   /* aviso interno: el torneo terminó */
             break;

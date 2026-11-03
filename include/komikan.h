@@ -1,6 +1,12 @@
 #ifndef KOMIKAN_H
 #define KOMIKAN_H
 
+/* Habilita las funciones POSIX 2008 (mutex robustos, rand_r, nanosleep,
+   clock_gettime, sigwait...) */
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdbool.h>
@@ -18,6 +24,7 @@
 #define NUM_PIEZAS       (NUM_PERROS + 1)   /* índice 0 = puma, 1..12 = perros */
 #define CAPTURAS_VICTORIA 6
 #define VACIA            (-1)
+#define RETARDO_MAX_PERMITIDO 10000  /* ms: tope para retardo_max en la config */
 #define MAX_MOVIMIENTOS  1000  /* límite para evitar partidas infinitas */
 
 typedef enum { PUMA, PERRO } TipoPieza;
@@ -66,14 +73,14 @@ typedef struct {
     unsigned int semilla;
     int pos_puma;
     int pos_perros[NUM_PERROS];
-    double prob_fallo;             /* para probar resiliencia (Parte 5) */
+    double prob_fallo;             /* prob. de fallo por ciclo de cada pieza */
 } Config;
 
 //prototipos de configuracion (src/config.c)
 void config_por_defecto(Config *c);
 bool config_cargar(Config *c, const char *ruta);
 bool config_validar(const Config*c);
-void config_imprimir(const Config *c, FILE *out);
+void config_imprimir(const Config *c);   /* escribe la config en el log */
 
 //log thread safe (src/log.c)
 bool log_abrir(const char *ruta);                 /* ruta NULL = solo consola */
@@ -142,7 +149,7 @@ typedef struct {
     int esperando;             /* id del jugador esperando rival, -1 si nadie */
     int llegados;              /* cuántos jugadores han llegado */
     int partidas;              /* contador de partidas (número de partida) */
-    bool apagando;             /* true tras Ctrl+C (Parte 6) */
+    bool apagando;             /* true tras Ctrl+C o error al crear hilos */
 } Servidor;
 
 typedef struct {
@@ -159,7 +166,7 @@ void servidor_destruir(Servidor *s);
 void servidor_apagar(Servidor *s);  /* Ctrl+C: apagado ordenado */
 
 // señales(src/senales.c)
-bool senales_iniciar(Servidor *s);  /* Bloquea SIGINT y crea el hilo de señañes */
-void senales_detener(void);              /* Desbloquea SIGINT y termina el hilo de señales */
+bool senales_iniciar(Servidor *s);  /* Bloquea SIGINT/SIGUSR1 y crea el hilo de señales */
+void senales_detener(void);         /* Desbloquea SIGINT y termina el hilo de señales */
 
 #endif

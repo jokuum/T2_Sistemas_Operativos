@@ -79,7 +79,8 @@ bool config_cargar(Config *c, const char *ruta) {
 
 bool config_validar(const Config *c) {
     //1. Retardos_ no negativos y min <= max
-    if (c->retardo_min_ms < 0 || c->retardo_max_ms < c->retardo_min_ms) {
+    if (c->retardo_min_ms < 0 || c->retardo_max_ms < c->retardo_min_ms ||
+        c->retardo_max_ms > RETARDO_MAX_PERMITIDO) {
         fprintf(stderr, "config: retardos invalidos (min=%d, max=%d)\n",
                 c->retardo_min_ms, c->retardo_max_ms);
         return false;
@@ -112,11 +113,14 @@ bool config_validar(const Config *c) {
     return true;
 }
 
-void config_imprimir(const Config *c, FILE *out) {
-    fprintf(out, "Config: retardo=[%d,%d] ms, semilla=%u, prob_fallo=%.2f, puma=%d, perros=",
-            c->retardo_min_ms, c->retardo_max_ms, c->semilla, c->prob_fallo, c->pos_puma);
-
+void config_imprimir(const Config *c) {
+    char perros[64];
+    int pos = 0;
     for (int i = 0; i < NUM_PERROS; i++) {
-        fprintf(out, "%d%s", c->pos_perros[i], i + 1 < NUM_PERROS ? "," : "\n");
+        pos += snprintf(perros + pos, sizeof(perros) - pos, "%d%s",
+                        c->pos_perros[i], i + 1 < NUM_PERROS ? "," : "");
     }
+    log_msg(-1, "Config: retardo=[%d,%d] ms, semilla=%u, prob_fallo=%.3f, puma=%d, perros=%s",
+            c->retardo_min_ms, c->retardo_max_ms, c->semilla, c->prob_fallo,
+            c->pos_puma, perros);
 }
