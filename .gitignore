@@ -1,11 +1,16 @@
+# Compilación
 build/
+*.o
+*.dSYM/
+
+# Ejecutables
 torneo
 test_tablero
-*.o
-*.log
-.DS_Store
-*.dSYM/
-*.dSYM/
 test_log
-test.log
 test_aleatorio
+
+# Logs generados al ejecutar (torneo.log, test.log)
+*.log
+
+# macOS
+.DS_Store
