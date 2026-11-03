@@ -166,8 +166,8 @@ void servidor_ejecutar(Servidor *s) {
         pthread_join(clientes[i].hilo, NULL);
     }
     free(clientes);
-    log_msg(-1, "Torneo finalizado%s: %d partidas iniciadas",
-            s->apagando ? " por Ctrl+C" : "", s->partidas);
+    log_msg(-1, "Torneo %s: %d parejas formadas",
+            s->apagando ? "interrumpido" : "finalizado", s->partidas);
 }
 
 // Apagado ordenado (Ctrl+C)
