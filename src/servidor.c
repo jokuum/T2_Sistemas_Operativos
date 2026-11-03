@@ -1,5 +1,6 @@
 #include "komikan.h"
 #include <stdlib.h>
+#include <string.h>
 
 // Creacion y destruccion 
 
@@ -148,12 +149,20 @@ void servidor_ejecutar(Servidor *s) {
         perror("malloc");
         return;
     }
+        int creados = 0;
     for (int i = 0; i < s->N; i++) {
         clientes[i].id  = i;
         clientes[i].srv = s;
-        pthread_create(&clientes[i].hilo, NULL, hilo_cliente, &clientes[i]);
+        int rc = pthread_create(&clientes[i].hilo, NULL, hilo_cliente, &clientes[i]);
+        if (rc != 0) {
+            log_msg(-1, "No se pudo crear el hilo del jugador %d: %s",
+                    i, strerror(rc));
+            servidor_apagar(s);   /* despierta a quien quedó esperando rival */
+            break;
+        }
+        creados++;
     }
-    for (int i = 0; i < s->N; i++) {
+    for (int i = 0; i < creados; i++) {
         pthread_join(clientes[i].hilo, NULL);
     }
     free(clientes);
@@ -170,8 +179,7 @@ void servidor_apagar(Servidor *s) {
         return;
     }
     s->apagando = true;
-    log_msg(-1, "SIGINT recibido: apagando servidor...");
-
+    log_msg(-1, "Apagando servidor...");
     /* 1. Despertar al jugador que espera rival */
     pthread_cond_broadcast(&s->cv_pareja);
 
